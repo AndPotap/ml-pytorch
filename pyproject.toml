@@ -3,6 +3,7 @@ name = "ml-pytorch"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "numpy>=2.4.6",
     "pytest>=9.0.3",
     "python-lsp-server[flake8,mccabe,pycodestyle,pydocstyle,pyflakes,pylint,rope,yapf]>=1.14.0",
     "ruff>=0.15.16",
