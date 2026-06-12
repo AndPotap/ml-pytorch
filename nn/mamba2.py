@@ -1,6 +1,26 @@
 import torch
 import torch.nn.functional as F
 from einops import rearrange, repeat
+import numpy as np
+
+
+def mamba2_recursive_np(x, alpha, gamma, B, C):
+    # x: [T,]
+    # alpha: [T,]
+    # gamma: [T,]
+    # B: [T,N]
+    # C: [T,N]
+
+    dtype = x.dtype
+    T, N = B.shape
+    h = np.empty(shape=(T + 1, N), dtype=dtype)
+    h[0] = 0.0  # initial condition
+    y = np.empty_like(x)
+
+    for t in range(T):
+        h[t + 1] = alpha[t] * h[t] + gamma[t] * B[t] * x[t]
+        y[t] = np.sum(C[t] * h[t + 1])
+    return y
 
 
 def segsum(x):

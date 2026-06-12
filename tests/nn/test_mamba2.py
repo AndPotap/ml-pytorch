@@ -1,6 +1,23 @@
 import torch
 import torch.nn.functional as F
-from nn.mamba2 import ssd_minimal_discrete
+import numpy as np
+from nn.mamba2 import ssd_minimal_discrete, mamba2_recursive_np
+
+
+def test_mamba2_recursive_np():
+    T, N = 3, 2
+    dtype = np.float32
+    rng = np.random.default_rng(seed=21)
+
+    x = rng.normal(size=(T, )).astype(dtype)
+    gamma = rng.uniform(size=(T, )).astype(dtype)
+    A = np.abs(rng.normal(size=(T, )).astype(dtype))
+    alpha = np.exp(-gamma * A)
+    B = rng.normal(size=(T, N)).astype(dtype)
+    C = rng.normal(size=(T, N)).astype(dtype)
+
+    y = mamba2_recursive_np(x, alpha, gamma, B, C)
+    assert y.shape == (T, )
 
 
 def test_mamba2():
