@@ -4,6 +4,65 @@ from einops import rearrange, repeat
 import numpy as np
 
 
+def mamba2_chunked_np(X, A, B, C, block_len, initial_states=None):
+    # X: [T,]
+    # A: [T,]
+    # B: [T,N]
+    # C: [T,N]
+    assert X.dtype == A.dtype == B.dtype == C.dtype
+    assert X.shape[0] % block_len == 0
+
+    X, A, B, C = [rearrange(x, "(c l) ... -> c l ...", l=block_len) for x in (X, A, B, C)]
+
+    L = create_L_np(A)
+    Y_diag = np.einsum("cln,csn,cls,cs->cl", C, B, L, X)
+
+    A_cumsum = np.cumsum(A, axis=-1)
+    decay_states = np.exp((A_cumsum[..., [-1]] - A_cumsum))
+    states = np.einsum("cln,cl,cl->cn", B, decay_states, X)
+
+    if initial_states is None:
+        initial_states = np.zeros((1, states.shape[1]), dtype=states.dtype)
+    states = np.concatenate([initial_states, states], axis=0)
+    decay_chunk = create_L_np(np.pad(A_cumsum[..., -1], (1, 0)))
+    new_states = np.einsum("zc,cn->zn", decay_chunk, states)
+    states, final_state = new_states[:-1], new_states[-1]
+
+    state_decay_out = np.exp(A_cumsum)
+    Y_off = np.einsum("cln,cn,cl->cl", C, states, state_decay_out)
+
+    Y = rearrange(Y_diag + Y_off, "c l -> (c l)")
+    return Y, final_state
+
+
+def mamba2_ssd_np(x, alpha, gamma, B, C):
+    # x: [T,]
+    # alpha: [T,]
+    # gamma: [T,]
+    # B: [T,N]
+    # C: [T,N]
+
+    L = create_L_np(np.log(alpha))
+    y = (L * (C @ B.T)) @ (gamma * x)
+    return y
+
+
+def create_L_np(log_alpha):
+    # log_alpha: [T,]
+
+    T = log_alpha.shape[-1]
+    log_L = repeat(log_alpha, "... d -> ... d e", e=T)
+    mask = np.tril(np.ones(shape=(T, T), dtype=log_alpha.dtype), k=-1)
+    log_L = np.cumsum(log_L * mask, axis=-2)
+    # mask = np.tril(np.ones(shape=(T, T), dtype=np.bool), k=0)
+    # mask = np.tril(np.ones(shape=(T, T), dtype=log_alpha.dtype), k=0)
+    mask = np.triu(np.full((T, T), -np.inf, dtype=log_alpha.dtype), k=1)
+    log_L = log_L + mask
+    # log_L[~mask] = -np.inf
+    # log_L = log_L.masked_fill(~mask, -np.inf)
+    return np.exp(log_L)
+
+
 def mamba2_recursive_np(x, alpha, gamma, B, C):
     # x: [T,]
     # alpha: [T,]
