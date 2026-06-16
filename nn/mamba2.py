@@ -24,7 +24,7 @@ def mamba2_chunked_np(X, A, B, C, block_len, initial_states=None):
     if initial_states is None:
         initial_states = np.zeros((1, states.shape[1]), dtype=states.dtype)
     states = np.concatenate([initial_states, states], axis=0)
-    decay_chunk = create_L_np(np.pad(A_cumsum[..., -1], (1, 0)))
+    decay_chunk = create_L_np(np.pad(A_cumsum[..., -1], pad_width=(1, 0)))
     new_states = np.einsum("zc,cn->zn", decay_chunk, states)
     states, final_state = new_states[:-1], new_states[-1]
 
