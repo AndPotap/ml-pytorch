@@ -8,9 +8,9 @@ class RoPE(Module):
         assert embd % 2 == 0, f"{embd=} is not divisible by 2"
         embd_half = embd // 2
         theta = 10**-(4.0 * torch.arange(embd_half) / embd_half)
-        theta = torch.arange(max_seq)[:, None] * theta[None, :]
-        self.register_buffer("cos", torch.cos(theta)[None], persistent=False)
-        self.register_buffer("sin", torch.sin(theta)[None], persistent=False)
+        phi = torch.arange(max_seq)[:, None] * theta[None, :]
+        self.register_buffer("cos", torch.cos(phi)[None], persistent=False)
+        self.register_buffer("sin", torch.sin(phi)[None], persistent=False)
 
     def forward(self, x):
         # x: [...,S,2D]
