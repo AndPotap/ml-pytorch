@@ -4,6 +4,34 @@ from einops import rearrange, repeat
 import numpy as np
 
 
+def mamba2_np(X, A, B, C, block_len):
+    # X: [T,]
+    # A: [T,]
+    # B: [T,N]
+    # C: [T,N]
+    assert X.shape[0] % block_len == 0
+    X, A, B, C = [rearrange(v, "(c l) ... -> c l ...", l=block_len) for v in (X, A, B, C)]
+
+    L = create_L_np(A)
+    Y_diag = np.einsum("cln,csn,cls,cs->cl", C, B, L, X)
+
+    A_cumsum = np.cumsum(A, axis=-1)
+    decay_states = np.exp((A_cumsum[..., [-1]] - A_cumsum))
+    states = np.einsum("cln,cl,cl->cn", B, decay_states, X)
+
+    initial_states = np.zeros((1, states.shape[1]), dtype=states.dtype)
+    states = np.concatenate([initial_states, states], axis=0)
+    decay_chunk = create_L_np(np.pad(A_cumsum[..., -1], pad_width=(1, 0)))
+    new_states = np.einsum("zc,cn->zn", decay_chunk, states)
+    states = new_states[:-1]
+
+    state_decay_out = np.exp(A_cumsum)
+    Y_off = np.einsum("cln,cn,cl->cl", C, states, state_decay_out)
+
+    Y = rearrange(Y_diag + Y_off, "c l -> (c l)")
+    return Y
+
+
 def mamba2_chunked_np(X, A, B, C, block_len, initial_states=None):
     # X: [T,]
     # A: [T,]
